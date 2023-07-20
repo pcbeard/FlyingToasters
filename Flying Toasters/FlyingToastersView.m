@@ -125,7 +125,7 @@
     }
 }
 
-- (void)_addNodeWithTextures:(NSArray*)textures andSpeed:(CGFloat)speedRate
+- (void)_addNodeWithTextures:(NSArray<SKTexture *> *)textures andSpeed:(CGFloat)speedRate
 {
     if (textures.count && self.toasterScene != nil) {
         SKSpriteNode* node = [SKSpriteNode spriteNodeWithTexture:textures[0]];
@@ -167,7 +167,7 @@
     }
 }
 
-- (NSArray*)getToasterTextures
+- (NSArray<SKTexture *> *)getToasterTextures
 {
     NSBundle* thisBundle = [NSBundle bundleForClass:[self class]];
     NSString* texture1 = [thisBundle pathForResource:@"Textures/toaster01" ofType:@"png"];
@@ -204,7 +204,7 @@
     return textures;
 }
 
-- (NSArray*)getToastTexture
+- (NSArray<SKTexture *> *)getToastTexture
 {
     NSString* textureName = @"Textures/toast1.gif";
     
