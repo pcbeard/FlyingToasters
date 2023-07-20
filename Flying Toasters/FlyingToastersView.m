@@ -9,6 +9,9 @@
 #import "FlyingToastersView.h"
 #import "ScreenSaverScene.h"
 
+// in the original Flying Toasters, the wings flapped at a constant rate, regardless of speed.
+static const NSTimeInterval flapFrameDuration = 0.04;
+
 @interface FlyingToastersView ()
 @property (strong) ScreenSaverScene* toasterScene;
 
@@ -147,7 +150,7 @@
         CGFloat duration = [self _speedForRate:speedRate withInitialPoint:startPosition andEndpoint:endPosition nodeSize:node.size];
         
         if (textures.count > 1) {
-            SKAction* animateAction = [SKAction animateWithTextures:textures timePerFrame:0.085 resize:NO restore:YES];
+            SKAction* animateAction = [SKAction animateWithTextures:textures timePerFrame:flapFrameDuration resize:NO restore:YES];
             SKAction* repeatedAnimationAction = [SKAction repeatActionForever:animateAction];
             [node runAction:repeatedAnimationAction];
         }
