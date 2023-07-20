@@ -131,7 +131,14 @@ static const NSTimeInterval flapFrameDuration = 0.04;
 - (void)_addNodeWithTextures:(NSArray<SKTexture *> *)textures andSpeed:(CGFloat)speedRate
 {
     if (textures.count && self.toasterScene != nil) {
-        SKSpriteNode* node = [SKSpriteNode spriteNodeWithTexture:textures[0]];
+        SKTexture *texture = textures.firstObject;
+        SKSpriteNode* node = [SKSpriteNode spriteNodeWithTexture:texture];
+        
+        // experimental:  attach a physics body.
+        SKPhysicsBody *body = [SKPhysicsBody bodyWithTexture:texture size:texture.size];
+        body.usesPreciseCollisionDetection = YES;
+        body.affectedByGravity = NO;
+        node.physicsBody = body;
         
         NSAssert(self.toasterScene != nil, @"Error: Toaster Scene not set!");
         CGSize sceneSize = self.toasterScene.size;
