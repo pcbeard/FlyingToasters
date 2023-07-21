@@ -10,16 +10,18 @@
 #import "ScreenSaverScene.h"
 
 // in the original Flying Toasters, the wings flapped at a constant rate, regardless of speed.
-static const NSTimeInterval flapFrameDuration = 0.04;
+static const NSTimeInterval flapFrameDuration = 0.08;
 
-@interface FlyingToastersView ()
-@property (strong) ScreenSaverScene* toasterScene;
+@interface FlyingToastersView () <SKSceneDelegate, SKPhysicsContactDelegate>
+@property (strong) ScreenSaverScene *toasterScene;
+@property (strong) NSMutableArray<SKPhysicsBody *> *inContactBodies;
 
 @property (readonly) CGFloat speedMultiplier;
 @property (readonly) CGFloat fastSpeedMultipler;
 @end
 
 @implementation FlyingToastersView
+
 - (instancetype)init
 {
     if (self = [super initWithFrame:NSZeroRect]) {
@@ -28,6 +30,13 @@ static const NSTimeInterval flapFrameDuration = 0.04;
         
         _toasterScene = [[ScreenSaverScene alloc] initWithSize:self.frame.size];
         _toasterScene.backgroundColor = [NSColor blackColor];
+        _toasterScene.delegate = self;
+        
+        SKPhysicsWorld *world = _toasterScene.physicsWorld;
+        world.gravity = CGVectorMake(0, 0);
+        world.contactDelegate = self;
+        
+        _inContactBodies = [NSMutableArray new];
 
         [self presentScene:_toasterScene];
     }
@@ -128,16 +137,69 @@ static const NSTimeInterval flapFrameDuration = 0.04;
     }
 }
 
+- (void)didFinishUpdateForScene:(SKScene *)scene
+{
+    if (_inContactBodies.count > 0) {
+        // how do we lerp the velocity smoothly?
+        for (SKPhysicsBody *body in _inContactBodies) {
+            SKNode *node = body.node;
+            NSDictionary *userData = node.userData;
+            CGFloat dx = [userData[@"dx"] doubleValue];
+            CGFloat dy = [userData[@"dy"] doubleValue];
+            body.velocity = CGVectorMake(dx, dy);
+        }
+        [_inContactBodies removeAllObjects];
+    }
+    NSArray *nodes = [_toasterScene.children copy];
+    for (SKNode *node in nodes) {
+        CGPoint position = node.position;
+        CGSize size = node.frame.size;
+        if (position.y < -size.height || position.x < -size.width) {
+            [node removeFromParent];
+            
+            NSDictionary* userData = node.userData;
+            NSArray<SKTexture *> *textures = userData[@"textures"];
+            CGFloat speedRate = [userData[@"speedRate"] doubleValue];
+            
+            // Add another one to replace this one
+            [self _addNodeWithTextures:textures andSpeed:speedRate];
+        }
+    }
+}
+
+- (void)didEndContact:(SKPhysicsContact *)contact
+{
+    SKPhysicsBody *bodyA = contact.bodyA, *bodyB = contact.bodyB;
+    if (bodyA.allContactedBodies.count == 0) {
+        [_inContactBodies addObject:bodyA];
+    }
+    if (bodyB.allContactedBodies.count == 0) {
+        [_inContactBodies addObject:bodyB];        
+    }
+}
+
 - (void)_addNodeWithTextures:(NSArray<SKTexture *> *)textures andSpeed:(CGFloat)speedRate
 {
     if (textures.count && self.toasterScene != nil) {
         SKTexture *texture = textures.firstObject;
         SKSpriteNode* node = [SKSpriteNode spriteNodeWithTexture:texture];
+        NSMutableDictionary *userData = [@{
+            @"textures" : textures, @"speedRate" : @(speedRate)
+        } mutableCopy];
+        node.userData = userData;
         
-        // experimental:  attach a physics body.
+        BOOL isFast = speedRate == self.fastSpeedMultipler;
+        
+        // all toaster motion now uses a physics body.
         SKPhysicsBody *body = [SKPhysicsBody bodyWithTexture:texture size:texture.size];
         body.usesPreciseCollisionDetection = YES;
         body.affectedByGravity = NO;
+        body.allowsRotation = NO;
+        body.contactTestBitMask = 0x1;
+        body.friction = 0;
+        body.linearDamping = 0;
+        body.mass = isFast ? 1.0 : 3.0;
+        body.restitution = 1.0;
         node.physicsBody = body;
         
         NSAssert(self.toasterScene != nil, @"Error: Toaster Scene not set!");
@@ -153,14 +215,28 @@ static const NSTimeInterval flapFrameDuration = 0.04;
         
         node.position = startPosition;
         [self.toasterScene addChild:node];
-        
-        CGFloat duration = [self _speedForRate:speedRate withInitialPoint:startPosition andEndpoint:endPosition nodeSize:node.size];
-        
+
+        // use physics to move the toasters. I have no idea what these units mean!
+        CGVector velocity = CGVectorMake(-120, -80);
+        if (isFast) {
+            velocity.dx *= 2;
+            velocity.dy *= 2;
+        }
+        body.velocity = velocity;
+        userData[@"dx"] = @(velocity.dx);
+        userData[@"dy"] = @(velocity.dy);
+
         if (textures.count > 1) {
-            SKAction* animateAction = [SKAction animateWithTextures:textures timePerFrame:flapFrameDuration resize:NO restore:YES];
+            SKAction* animateAction = [SKAction animateWithTextures:textures
+                                                       timePerFrame:isFast ? flapFrameDuration / 2 : flapFrameDuration
+                                                             resize:NO restore:YES];
             SKAction* repeatedAnimationAction = [SKAction repeatActionForever:animateAction];
             [node runAction:repeatedAnimationAction];
         }
+        
+#if 0
+        // old way, using actions.
+        CGFloat duration = [self _speedForRate:speedRate withInitialPoint:startPosition andEndpoint:endPosition nodeSize:node.size];
         
         __weak FlyingToastersView* toasterView = self;
         SKAction* flyAction = [SKAction moveTo:endPosition duration:duration];
@@ -174,6 +250,7 @@ static const NSTimeInterval flapFrameDuration = 0.04;
         
         SKAction* nodeActions = [SKAction sequence:@[flyAction, doneAction]];
         [node runAction:nodeActions];
+#endif
     }
 }
 
