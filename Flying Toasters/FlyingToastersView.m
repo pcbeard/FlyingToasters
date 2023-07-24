@@ -14,6 +14,7 @@ static const NSTimeInterval flapFrameDuration = 0.08;
 
 @interface FlyingToastersView () <SKSceneDelegate, SKPhysicsContactDelegate>
 @property (strong) ScreenSaverScene *toasterScene;
+@property (assign) CGFloat toasterScale;
 @property (strong) NSMutableArray<SKPhysicsBody *> *inContactBodies;
 
 @property (readonly) CGFloat speedMultiplier;
@@ -32,6 +33,10 @@ static const NSTimeInterval flapFrameDuration = 0.08;
         _toasterScene.backgroundColor = [NSColor blackColor];
         _toasterScene.delegate = self;
         
+        // Use smaller sprites when drawing in a smaller than main screen sized view.
+        NSSize mainScreenSize = NSScreen.mainScreen.frame.size;
+        _toasterScale = mainScreenSize.width != frame.size.width ? 4 : 1;
+        
         SKPhysicsWorld *world = _toasterScene.physicsWorld;
         world.gravity = CGVectorMake(0, 0);
         world.contactDelegate = self;
@@ -48,6 +53,8 @@ static const NSTimeInterval flapFrameDuration = 0.08;
 {
     [super setFrame:frame];
     _toasterScene.size = frame.size;
+    NSSize mainScreenSize = NSScreen.mainScreen.frame.size;
+    _toasterScale = mainScreenSize.width != frame.size.width ? 4 : 1;
 }
 
 - (CGFloat)speedMultiplier
@@ -151,10 +158,18 @@ static const NSTimeInterval flapFrameDuration = 0.08;
         [_inContactBodies removeAllObjects];
     }
     NSArray *nodes = [_toasterScene.children copy];
+    CGSize sceneSize = _toasterScene.size;
     for (SKNode *node in nodes) {
-        CGPoint position = node.position;
-        CGSize size = node.frame.size;
-        if (position.y < -size.height || position.x < -size.width) {
+        CGRect frame = node.frame;
+        if (CGRectGetMaxY(frame) < 0 || CGRectGetMaxX(frame) < 0) {
+            #if 1
+            CGPoint startPosition = CGPointZero, endPosition = CGPointZero;
+            [self _getRandomStartingPoint:&startPosition
+                           andEndingPoint:&endPosition
+                              forNodeSize:frame.size
+                             andSceneSize:sceneSize];
+            node.position = startPosition;
+            #else
             [node removeFromParent];
             
             NSDictionary* userData = node.userData;
@@ -163,6 +178,7 @@ static const NSTimeInterval flapFrameDuration = 0.08;
             
             // Add another one to replace this one
             [self _addNodeWithTextures:textures andSpeed:speedRate];
+            #endif
         }
     }
 }
@@ -188,10 +204,15 @@ static const NSTimeInterval flapFrameDuration = 0.08;
         } mutableCopy];
         node.userData = userData;
         
+        CGSize scaledSize = node.size;
+        scaledSize.height /= _toasterScale;
+        scaledSize.width /= _toasterScale;
+        [node scaleToSize:scaledSize];
+        
         BOOL isFast = speedRate == self.fastSpeedMultipler;
         
         // all toaster motion now uses a physics body.
-        SKPhysicsBody *body = [SKPhysicsBody bodyWithTexture:texture size:texture.size];
+        SKPhysicsBody *body = [SKPhysicsBody bodyWithTexture:texture size:node.size];
         body.usesPreciseCollisionDetection = YES;
         body.affectedByGravity = NO;
         body.allowsRotation = NO;
@@ -222,6 +243,8 @@ static const NSTimeInterval flapFrameDuration = 0.08;
             velocity.dx *= 2;
             velocity.dy *= 2;
         }
+        velocity.dx /= _toasterScale;
+        velocity.dy /= _toasterScale;
         body.velocity = velocity;
         userData[@"dx"] = @(velocity.dx);
         userData[@"dy"] = @(velocity.dy);
