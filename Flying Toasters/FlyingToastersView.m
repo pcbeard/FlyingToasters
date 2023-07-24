@@ -22,13 +22,13 @@ static const NSTimeInterval flapFrameDuration = 0.08;
 
 @implementation FlyingToastersView
 
-- (instancetype)init
+- (instancetype)initWithFrame:(NSRect)frame
 {
-    if (self = [super initWithFrame:NSZeroRect]) {
+    if (self = [super initWithFrame:frame]) {
         _speed = kMediumSpeed;
         _toastLevel = kGoldenBrownToast;
         
-        _toasterScene = [[ScreenSaverScene alloc] initWithSize:self.frame.size];
+        _toasterScene = [[ScreenSaverScene alloc] initWithSize:frame.size];
         _toasterScene.backgroundColor = [NSColor blackColor];
         _toasterScene.delegate = self;
         

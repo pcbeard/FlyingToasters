@@ -9,6 +9,7 @@
 #import "FlyingToasterPreferencesController.h"
 #import "FlyingToastersView.h"
 #import "FlyingToasterScreenSaverView.h"
+#import <CoreFoundation/CFCGTypes.h>
 
 @interface FlyingToasterScreenSaverView ()
 @property (strong) FlyingToastersView* ftv;
@@ -16,18 +17,32 @@
 @end
 
 @implementation FlyingToasterScreenSaverView
+
 - (instancetype)initWithFrame:(NSRect)frame isPreview:(BOOL)isPreview
 {
     if (self = [super initWithFrame:frame isPreview:isPreview]) {
-        [self setAnimationTimeInterval:1/30.0];
-        
-        _ftv = [[FlyingToastersView alloc] init];
-        _ftv.frame = NSMakeRect(0, 0, frame.size.width, frame.size.height);
-        
-        [self addSubview:_ftv];
+        if (isPreview) {
+            _ftv = [[FlyingToastersView alloc] initWithFrame:frame];
+            [self addSubview:_ftv];
+        }
     }
-    
     return self;
+}
+
+- (void)viewDidMoveToWindow {
+    [super viewDidMoveToWindow];
+    
+    if (!self.isPreview) {
+        // idea:  lazily create the sub-view if *THIS* window is on the main display.
+        NSScreen *screen = self.window.screen;
+        if (screen == NSScreen.mainScreen) {
+            NSRect frame = self.frame;
+            _ftv = [[FlyingToastersView alloc] initWithFrame:frame];        
+            [self addSubview:_ftv];
+            
+            self.animationTimeInterval = 1 / 60.0;
+        }
+    }
 }
 
 - (void)setFrame:(NSRect)frame
@@ -40,11 +55,14 @@
 {
     [super startAnimation];
     
-    self.ftv.toastLevel = [ToasterDefaults getToastLevel];
-    self.ftv.speed = [ToasterDefaults getFlightSpeed];
-    self.ftv.numOfToasters = [ToasterDefaults getNumberOfToasters];
-    
-    [self.ftv start];
+    FlyingToastersView *ftv = self.ftv;
+    if (ftv != nil) {
+        ftv.toastLevel = [ToasterDefaults getToastLevel];
+        ftv.speed = [ToasterDefaults getFlightSpeed];
+        ftv.numOfToasters = [ToasterDefaults getNumberOfToasters];
+        
+        [ftv start];
+    }
 }
 
 - (void)stopAnimation
